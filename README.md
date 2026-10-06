@@ -170,6 +170,23 @@ Micrófono y compartir pantalla exigen contexto seguro: todas las opciones anter
 - Las rutas que escriben (`POST /api/servers`, `channels`, `messages`, `livekit/token`) exigen sesión; el autor de los mensajes se toma del JWT, no del cliente.
 - Cuentas creadas antes de esta versión (sin contraseña): registrarse con el mismo nombre "reclama" la cuenta poniéndole contraseña.
 
+## Solución de problemas
+
+### `could not establish signal connection: invalid token` al entrar a un canal de voz
+
+El backend acuña el JWT con `nbf` retrocedido 10 min (tolerante a desfases de reloj), así que este error hoy casi siempre es credenciales. Diagnostica en 5 segundos:
+
+```powershell
+npm run check:livekit            # firma un token real y prueba la señalización contra tu servidor LiveKit
+npm run check:livekit -- --backdate   # si SOLO este modo pasa: reloj desfasado -> w32tm /resync
+```
+
+Causas en orden de probabilidad:
+
+1. **`.env` editado con el servidor arrancado** — Next solo lee `.env` al iniciar: guarda el archivo y reinicia (`Ctrl+C` → `npm run dev`).
+2. **API key y secret de proyectos distintos** (o clave revocada/regenerada): copia AMBOS del mismo proyecto en <https://cloud.livekit.io> → *Settings → API Keys*.
+3. **Reloj del sistema desfasado** (>10 min): sincroniza Windows (`w32tm /resync` como administrador, o Configuración → Hora e idioma → Sincronizar ahora). El backend tolera hasta 10 min, pero sincronizar es gratis.
+
 ## Limitaciones conocidas del MVP
 
 - **Auth**: usuario + contraseña con sesión JWT (7 días). Siguiente paso natural: OAuth, verificación de email, 2FA y membresías por servidor con roles.

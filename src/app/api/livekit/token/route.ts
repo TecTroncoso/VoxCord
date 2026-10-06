@@ -1,10 +1,59 @@
 import { NextResponse } from 'next/server';
-import { AccessToken } from 'livekit-server-sdk';
+import { createHmac } from 'node:crypto';
 import { getSessionUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/livekit/token  { roomName } -> { token, url }  (requiere sesión)
+/**
+ * Acuñación del JWT de acceso a LiveKit (HS256) a mano, con dos diferencias
+ * clave frente al SDK oficial (livekit-server-sdk):
+ *
+ * - `nbf` retrocedido NBF_BACKDATE_SEC: el SDK oficial firma con nbf = "ahora"
+ *   exacto. Si el reloj del host va adelantado (incluso 1-2 min), LiveKit
+ *   rechaza el token como "invalid token" (aún no válido). Retrocederlo da
+ *   tolerancia al desfase sin sacrificar seguridad (sigue ligado a la firma).
+ * - Sin dependencia: el JWT de acceso es solo header.payload.firma HMAC.
+ */
+
+const NBF_BACKDATE_SEC = 600; // 10 min de tolerancia al clock skew
+const TOKEN_TTL_SEC = 2 * 60 * 60; // 2 h, igual que antes
+
+type VideoGrants = {
+  roomJoin: boolean;
+  room: string;
+  canPublish: boolean;
+  canSubscribe: boolean;
+  canPublishData: boolean;
+};
+
+function base64url(input: string): string {
+  return Buffer.from(input, 'utf8').toString('base64url');
+}
+
+function mintLiveKitToken(
+  apiKey: string,
+  apiSecret: string,
+  identity: string,
+  name: string,
+  video: VideoGrants,
+): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = base64url(
+    JSON.stringify({
+      iss: apiKey,
+      sub: identity,
+      name,
+      nbf: now - NBF_BACKDATE_SEC,
+      exp: now + TOKEN_TTL_SEC,
+      video,
+    }),
+  );
+  const sig = createHmac('sha256', apiSecret).update(`${header}.${payload}`).digest('base64url');
+  return `${header}.${payload}.${sig}`;
+}
+
+// POST /api/livekit/token  { roomName } -> { token, url, identity }  (requiere sesión)
 export async function POST(req: Request) {
   const apiKey = process.env.LIVEKIT_API_KEY?.trim();
   const apiSecret = process.env.LIVEKIT_API_SECRET?.trim();
@@ -21,21 +70,14 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const roomName = String(body?.roomName ?? '').trim();
-  const baseIdentity = session.id;
-  const displayName = session.username;
   if (!roomName) {
     return NextResponse.json({ error: 'roomName es obligatorio' }, { status: 400 });
   }
 
   // Sufijo aleatorio para permitir la misma cuenta en varias pestañas/dispositivos
-  const identity = `${baseIdentity}-${Math.random().toString(36).slice(2, 8)}`;
+  const identity = `${session.id}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const at = new AccessToken(apiKey, apiSecret, {
-    identity,
-    name: displayName,
-    ttl: '2h',
-  });
-  at.addGrant({
+  const token = mintLiveKitToken(apiKey, apiSecret, identity, session.username, {
     roomJoin: true,
     room: roomName,
     canPublish: true,
@@ -43,5 +85,5 @@ export async function POST(req: Request) {
     canPublishData: true,
   });
 
-  return NextResponse.json({ token: await at.toJwt(), url: serverUrl, identity });
+  return NextResponse.json({ token, url: serverUrl, identity });
 }
