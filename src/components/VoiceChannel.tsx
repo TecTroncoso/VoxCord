@@ -78,12 +78,26 @@ type MicPreset = {
 const MIC_PRESETS: Record<string, MicPreset> = {
   voice: {
     label: 'Voz (baja latencia)',
-    capture: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+    // latency: 0 -> el navegador elige el modo de captura de menor latencia
+    // (MediaTrackConstraints.latency; los navegadores sin soporte lo ignoran).
+    capture: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1,
+      latency: 0,
+    },
     publish: { audioPreset: AudioPresets.speech, dtx: true, red: true },
   },
   hd: {
     label: 'Voz HD',
-    capture: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+    capture: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1,
+      latency: 0,
+    },
     publish: { audioPreset: AudioPresets.music, dtx: true, red: true },
   },
   music: {
@@ -94,6 +108,7 @@ const MIC_PRESETS: Record<string, MicPreset> = {
       autoGainControl: false,
       channelCount: 2,
       sampleRate: 48000,
+      latency: 0,
     },
     publish: { audioPreset: AudioPresets.musicHighQualityStereo, forceStereo: true, dtx: false, red: true },
   },
@@ -111,11 +126,26 @@ const MIC_PRESETS: Record<string, MicPreset> = {
  */
 const DEFAULT_JITTER_TARGET_MS = 40;
 
-const JITTER_OPTIONS: Record<string, { label: string; ms: number }> = {
+const JITTER_OPTIONS: Record<string, { label: string; ms: number; auto?: boolean }> = {
+  auto: { label: 'Auto (ajusta según el jitter medido)', ms: DEFAULT_JITTER_TARGET_MS, auto: true },
+  max: { label: 'Máximo (0 ms · línea impecable, riesgo de cortes)', ms: 0 },
   ultra: { label: 'Ultra (20 ms · LAN/fibra estable)', ms: 20 },
   low: { label: 'Bajo (40 ms · recomendado)', ms: 40 },
   safe: { label: 'Equilibrado (80 ms · Wi-Fi/móvil)', ms: 80 },
 };
+
+/**
+ * Objetivo adaptativo a partir del jitter real medido (getStats inbound-rtp).
+ * Con línea limpia (jitter ~2 ms) es seguro bajar a 20 ms; con ráfagas,
+ * widen up para no cortar audio.
+ */
+function adaptiveJitterTarget(jitterMs: number | undefined, current: number): number {
+  if (jitterMs === undefined) return current;
+  if (jitterMs <= 4) return 20; // línea impecable
+  if (jitterMs <= 12) return 40;
+  if (jitterMs <= 25) return 60;
+  return 80; // ráfagas: prioriza estabilidad
+}
 
 function tuneAudioReceiver(receiver: RTCRtpReceiver, targetMs: number) {
   try {
@@ -315,8 +345,7 @@ function useAudioNetworkStats(room: Room): AudioStats | null {
   return stats;
 }
 
-function NetworkBadge({ room }: { room: Room }) {
-  const stats = useAudioNetworkStats(room);
+function NetworkBadge({ stats }: { stats: AudioStats | null }) {
   if (!stats) return null;
   const rtt = stats.rttMs;
   const quality = rtt === undefined ? '' : rtt < 80 ? 'text-online' : rtt < 150 ? 'text-yellow-500' : 'text-danger';
@@ -415,6 +444,8 @@ function ControlsBar({
         systemAudio: 'include',
         selfBrowserSurface: 'include',
         surfaceSwitching: 'include',
+        // No reproducir localmente el audio de la pestaña compartida: evita eco
+        suppressLocalAudioPlayback: true,
         ...preset.capture,
       },
       {
@@ -488,7 +519,7 @@ function ControlsBar({
 /* Sala conectada                                                      */
 /* ------------------------------------------------------------------ */
 
-function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset, onLeave, jitterMs }: {
+function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset, onLeave, jitterMs, jitterAuto, autoMic }: {
   channel: Channel;
   screenPreset: string;
   micPreset: string;
@@ -496,12 +527,37 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
   onMicPreset: (id: string) => void;
   onLeave: () => void;
   jitterMs: number;
+  jitterAuto: boolean;
+  autoMic: boolean;
 }) {
   const room = useRoomContext();
   const connectionState = useConnectionState();
   const participants = useParticipants();
-  const jitterRef = useRef(jitterMs);
-  jitterRef.current = jitterMs;
+  const { localParticipant } = useLocalParticipant();
+  const stats = useAudioNetworkStats(room);
+
+  // Jitter adaptativo: parte del objetivo manual y se ajusta al jitter real medido.
+  const [adaptiveMs, setAdaptiveMs] = useState(jitterMs);
+  const cleanStreak = useRef(0);
+  useEffect(() => {
+    if (!jitterAuto) {
+      setAdaptiveMs(jitterMs);
+      return;
+    }
+    const j = stats?.jitterMs;
+    if (j === undefined) return;
+    if (j <= 4) {
+      cleanStreak.current += 1;
+      if (cleanStreak.current >= 2) setAdaptiveMs(20);
+    } else {
+      cleanStreak.current = 0;
+      setAdaptiveMs((prev) => adaptiveJitterTarget(j, prev));
+    }
+  }, [stats, jitterAuto, jitterMs]);
+  const effectiveJitterMs = jitterAuto ? adaptiveMs : jitterMs;
+
+  const jitterRef = useRef(effectiveJitterMs);
+  jitterRef.current = effectiveJitterMs;
 
   // Baja latencia: jitter buffer controlado en cada audio suscrito
   useEffect(() => {
@@ -520,10 +576,20 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
     };
   }, [room]);
 
-  // Aplicar en caliente si el usuario cambia el objetivo
+  // Aplicar en caliente si el objetivo cambia (manual o adaptativo)
   useEffect(() => {
-    if (connectionState === 'connected') tuneAllAudioReceivers(room, jitterMs);
-  }, [room, jitterMs, connectionState]);
+    if (connectionState === 'connected') tuneAllAudioReceivers(room, effectiveJitterMs);
+  }, [room, effectiveJitterMs, connectionState]);
+
+  // Auto-mic: publicar el micrófono en cuanto conecta (primera palabra sin esperas)
+  const micArmed = useRef(false);
+  useEffect(() => {
+    if (!autoMic || micArmed.current) return;
+    if (connectionState !== 'connected') return;
+    micArmed.current = true;
+    const preset = MIC_PRESETS[micPreset];
+    localParticipant.setMicrophoneEnabled(true, preset.capture, preset.publish).catch(() => undefined);
+  }, [autoMic, connectionState, localParticipant, micPreset]);
   const screenTracks = useTracks([{ source: Track.Source.ScreenShare, withPlaceholder: false }], {
     onlySubscribed: false,
   }).filter(isTrackReference);
@@ -551,7 +617,8 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
               <span className="text-online">●</span> {participants.length} en el canal
               {room.serverInfo?.region ? ` · ${room.serverInfo.region}` : ''}
               {' · '}
-              <NetworkBadge room={room} />
+              <NetworkBadge stats={stats} />
+              <span className="text-muted"> · buffer {effectiveJitterMs} ms</span>
             </>
           ) : (
             <span className="text-yellow-500">● Conectando…</span>
@@ -584,9 +651,9 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
                     <SpeakingAvatar participant={p} />
                   )}
                 </div>
-                <p className="text-sm text-text truncate w-full text-center">
-                  {p.name || p.identity}
-                  {p.isMicrophoneEnabled ? '' : ' 🔇'}
+                <p className="flex items-center justify-center gap-1.5 text-sm text-text w-full min-w-0">
+                  <span className="truncate">{p.name || p.identity}</span>
+                  {!p.isMicrophoneEnabled && <MicIcon off className="w-3.5 h-3.5 shrink-0 text-danger" />}
                 </p>
               </div>
             );
@@ -620,8 +687,11 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
   const [error, setError] = useState<string | null>(null);
   const [screenPreset, setScreenPreset] = useState('p1080_30');
   const [micPreset, setMicPreset] = useState('voice');
-  const [jitterPreset, setJitterPreset] = useState('low');
+  const [jitterPreset, setJitterPreset] = useState('auto');
+  const [autoMic, setAutoMic] = useState(true);
+  const [prefetchReady, setPrefetchReady] = useState(false);
   const jitterMs = JITTER_OPTIONS[jitterPreset]?.ms ?? DEFAULT_JITTER_TARGET_MS;
+  const jitterAuto = Boolean(JITTER_OPTIONS[jitterPreset]?.auto);
 
   const roomOptions = useMemo<RoomOptions>(
     () => ({
@@ -664,9 +734,11 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
         });
         if (cancelled) return;
         prefetchedToken.current = t;
+        if (!cancelled) setPrefetchReady(true);
         room.prepareConnection(t.url, t.token).catch(() => undefined);
       } catch {
         // el error real se muestra al intentar unirse
+        if (!cancelled) setPrefetchReady(true);
       }
     })();
     return () => {
@@ -691,6 +763,14 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
       setConnecting(false);
     }
   }
+
+  // Auto-join: al llegar desde el sidebar (?join=1) conectamos en cuanto el token está listo
+  useEffect(() => {
+    if (!prefetchReady || token || connecting) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('join') === '1') void join();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefetchReady, token, connecting]);
 
   function leave() {
     setToken(null);
@@ -761,6 +841,15 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
                   ))}
                 </select>
               </label>
+              <label className="flex items-center gap-2 text-sm text-text cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoMic}
+                  onChange={(e) => setAutoMic(e.target.checked)}
+                  className="h-4 w-4 accent-accent"
+                />
+                Entrar con el micrófono abierto (sin esperas)
+              </label>
             </div>
 
             <button
@@ -798,6 +887,8 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
           onMicPreset={setMicPreset}
           onLeave={leave}
           jitterMs={jitterMs}
+          jitterAuto={jitterAuto}
+          autoMic={autoMic}
         />
       </LiveKitRoom>
       {error && (

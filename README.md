@@ -93,10 +93,15 @@ Abre <http://localhost:3000>. Sirve por **HTTPS** (p. ej. `cloudflared tunnel` /
 
 **Aplicado en el cliente (ya en código):**
 
-1. **`jitterBufferTarget` en los receivers de audio** (W3C WebRTC REC 2025): el jitter buffer adaptativo del navegador (NetEQ) es la partida más grande del retraso (~60–160 ms por defecto). VoxCord lo fija a **40 ms** en cada audio suscrito — el rango en el que opera TeamSpeak. Con RED/FEC activo, la pérdida ocasional se recupera sin cortes. Cambiable en `src/components/VoiceChannel.tsx` → `AUDIO_JITTER_TARGET_MS` (0–20 ms solo en LAN/fibra estable). Fallback automático a `playoutDelayHint` (segundos) en navegadores antiguos.
+1. **`jitterBufferTarget` en los receivers de audio** (W3C WebRTC REC 2025): el jitter buffer adaptativo del navegador (NetEQ) es la partida más grande del retraso (~60–160 ms por defecto). VoxCord lo controla por canal de voz con un selector: **Máximo 0 ms** / Ultra 20 ms / Bajo 40 ms / Equilibrado 80 ms / **Auto** (ver punto 5). Con RED/FEC activo, la pérdida ocasional se recupera sin cortes. Constante en `src/components/VoiceChannel.tsx`; fallback automático a `playoutDelayHint` (segundos) en navegadores antiguos. El nivel 0 ms solo para líneas impecable (jitter <3 ms medido): si oyes chasquidos con ráfagas, vuelve a `Auto`.
 2. **`room.prepareConnection()` + token prefetch**: al visitar el canal de voz se pre-negocia ICE/DTLS, así que "Unirse" conecta casi al instante.
-3. **Medidor en vivo**: la cabecera de la sala muestra **RTT real (getStats → candidate-pair) y jitter del audio entrante** cada 2 s — puedes verificar la mejora en lugar de creerla. Referencias: <80 ms verde, 80–150 amarillo, >150 rojo.
-4. Preset *Voz*: mono + **DTX** (no envía paquetes en silencio) + **RED** (paquetes duplicados = tolerancia a pérdida sin retransmisión) + EC/NS/AGC.
+3. **Auto-join de un clic**: los canales de voz del sidebar enlazan con `?join=1`, así que un solo clic ya entra a la sala (pre-token + pre-ICE); no hay botón intermedio.
+4. **Auto-mic** (checkbox, por defecto activo): el micrófono se publica en cuanto la conexión está lista, sin esperar un clic extra → la primera palabra no tiene retardo de "|".
+5. **Jitter adaptativo ("Auto", por defecto)**: el badge de red ya mide el jitter real (`inbound-rtp`); con línea limpia (≤4 ms) el objetivo baja solo a 20 ms y con ráfagas sube a 40–80 ms. La cabecera muestra el valor activo (`buffer X ms`).
+6. **Latencia de captura**: los presets de micrófono piden `latency: 0` (`MediaTrackConstraints.latency`, MDN) para que el navegador elija el modo de captura de menor latencia. Los navegadores que no lo soportan lo ignoran sin error.
+7. **Medidor en vivo**: la cabecera de la sala muestra **RTT real (getStats → candidate-pair) y jitter del audio entrante** cada 2 s — puedes verificar la mejora en lugar de creerla. Referencias: <80 ms verde, 80–150 amarillo, >150 rojo. Ojo: el RTT es tu tramo hasta **tu** SFU; si los participantes caen en regiones distintas (p. ej. Brazil y Eu-West), el audio cruza el enlace inter-región y eso no aparece en el número.
+8. Preset *Voz*: mono + **DTX** (no envía paquetes en silencio) + **RED** (paquetes duplicados = tolerancia a pérdida sin retransmisión) + EC/NS/AGC.
+9. **Pantalla**: `suppressLocalAudioPlayback` al compartir pestaña evita el eco del audio de la pestaña compartida.
 
 **Aplicado en el servidor self-host** (`deploy/livekit.low-latency.yaml`, claves del `config-sample.yaml` oficial):
 
@@ -107,15 +112,16 @@ Abre <http://localhost:3000>. Sirve por **HTTPS** (p. ej. `cloudflared tunnel` /
 - `room.playout_delay min 60 / max 500` (default 100/2000: techo de buffer más bajo para salas de voz).
 - TURN integrado solo como fallback.
 
-Tanto en Cloud como self-host: **elige la región más cercana** (visible en la cabecera de la sala), cable > Wi-Fi, y sin VPN.
+Tanto en Cloud como self-host: **elige la región más cercana** (visible en la cabecera de la sala), cable > Wi-Fi, y sin VPN. Con jugadores en continentes distintos, LiveKit Cloud reparte al PoP más cercano de cada uno y puentea entre regiones; si eso te penaliza, fija una región única en *Settings → Region* del proyecto (en self-host: `node_selector kind: regionaware` + `regions` en el YAML).
 
 **Investigado y descartado a propósito:**
 
 - *Rutar el audio remoto por WebAudio con `latencyHint: 'interactive'`*: `latencyHint` solo aplica a grafos WebAudio; el path nativo `<audio>` + NetEQ ya es el más corto en Chrome. Meter WebAudio en medio **añade** un quantum de render (~3–10 ms) → contraproducente.
-- *`ptime: 10` (frames Opus de 10 ms)*: requiere SDP munging (modificar el SDP a mano), API no estándar y frágil; ahorra ~10 ms de packetización. No implementado: si quieres experimentar, es el siguiente paso con mejor ratio riesgo/beneficio.
-- *Media over QUIC (WebTransport/MoQ)*: es el futuro para latencia sub-RTT a escala (Twitch/Meta lo prueban), pero en 2026 no hay stack de voz completo estable en navegadores. Vigilar: la ficha es "cuando madure MoQ, LiveKit ya está en ese WG".
+- *`ptime: 10` (frames Opus de 10 ms)*: requiere SDP munging (modificar el SDP a mano), no hay API estándar para ello y renegociar (al publicar mic/cámara) puede devolverlo a 20 ms. Ahorra ~10 ms de packetización. **No implementado a propósito**; si quieres experimentarlo: parchea `RTCPeerConnection.prototype.createOffer` solo durante `room.connect()` añadiendo `a=ptime:10` y `minptime=10` al fmtp de Opus, y **verifícalo en `getStats`**: `outbound-rtp.framesPerSecond ≈ 100` = ptime 10 ms activo (con 20 ms verás ~50).
+- *`RTCRtpScriptTransform` (Baseline 2025)*: es la vía estándar para E2EE y para procesar audio codificado en un worker (fuera del hilo principal). No reduce el buffer, pero es el camino para cifrado extremo a extremo y para filtros de voz sin casts en main thread.
+- *Media over QUIC (WebTransport/MoQ)*: el WG de IETF sigue activo con `draft-ietf-moq-transport` en versión 22 (oct 2026) y muchos drafts acompañantes, pero **sigue en estado Internet-Draft**: no hay stack de voz completo y estable en navegadores. Es la vía esperada para latencia sub-RTT a escala; vigilar, no construir todavía.
 
-**Latencia esperada con todo aplicado** (misma región, fibra): **~35–70 ms boca-a-oreja** ≈ TeamSpeak.
+**Latencia esperada con todo aplicado** (misma región, fibra): **~95–140 ms boca-a-oreja** (el suelo del navegador: captura AEC ~12 ms + frame Opus ~22 ms + render del OS ~18 ms son flooring fijo). TeamSpeak nativo (~60–100 ms) gana por no pasar por la pila de audio del navegador.
 
 ## Deploy gratis
 
@@ -187,12 +193,30 @@ Causas en orden de probabilidad:
 2. **API key y secret de proyectos distintos** (o clave revocada/regenerada): copia AMBOS del mismo proyecto en <https://cloud.livekit.io> → *Settings → API Keys*.
 3. **Reloj del sistema desfasado** (>10 min): sincroniza Windows (`w32tm /resync` como administrador, o Configuración → Hora e idioma → Sincronizar ahora). El backend tolera hasta 10 min, pero sincronizar es gratis.
 
+## Estado actual y próximos pasos (web)
+
+Lo que ya funciona de punta a punta: registro/login con contraseña, servidores y canales, chat en tiempo real (data channels de LiveKit con fallback SSE), voz con presets de micrófono y métricas de red en vivo, pantalla compartida hasta 4K/60 en VP9, cámara, diagnóstico de latencia (`npm run check:livekit`) y despliegue gratis configurado (Dockerfile/`render.yaml`, Vercel compatible).
+
+Para **terminar la versión web** (en este orden, de mayor valor por esfuerzo):
+
+1. **Membresías e invitaciones por servidor**: tabla de roles (`owner/admin/member`) + enlaces de invitación. Hoy cualquier usuario autenticado puede entrar a cualquier servidor.
+2. **Presencia real**: quién está en línea/en qué canal. LiveKit expone presencia de las salas a las que estás conectado; para presencia global hace falta un webhook de LiveKit o presencia en el data channel de un "lobby" por usuario.
+3. **Indicador de "escribiendo…"** y reacciones: gratis con los data channels que ya usamos (payload en el topic `chat`).
+4. **Búsqueda de mensajes** e historial paginado: `GET /api/channels/[id]/messages` ya acepta `after`/`limit`; falta cursor hacia atrás (`before`) e índice FTS5 en Turso.
+5. **Notificaciones**: web push (Service Worker) para mensajes y llamadas entrantes.
+6. **E2EE** en voz y chat: `RTCRtpScriptTransform` (Baseline 2025) + la API `e2ee` de LiveKit.
+7. **PWA / responsive**: instalable en móvil y con layout adaptado; es lo que marca la diferencia antes de cualquier cliente nativo.
+8. **Archivos y reacciones en voz**: subida de archivos (Turso o S3) y reacciones rápidas durante la llamada.
+
+Cliente nativo (escritorio/Android) queda **fuera de alcance hasta cerrar la web**; el objetivo de la web es que cubra el caso de uso completo en el navegador.
+
 ## Limitaciones conocidas del MVP
 
-- **Auth**: usuario + contraseña con sesión JWT (7 días). Siguiente paso natural: OAuth, verificación de email, 2FA y membresías por servidor con roles.
+- **Auth**: usuario + contraseña con sesión JWT (7 días). Siguiente paso natural: OAuth, verificación de email y 2FA.
+- **Permisos**: sin membresías todavía (ver próximos pasos); cualquier usuario autenticado ve todos los servidores.
 - **Chat SSE**: solo se usa como fallback sin LiveKit; con más de una instancia web el fallback necesitaría Redis/Turso CDC (el path principal, LiveKit data channels, ya es multi-instancia).
-- Sin E2EE (LiveKit soporta cifrado extremo a extremo con `e2ee`, fuera del MVP).
-- Sin listado de participantes de voz en el sidebar (requeriría webhooks de LiveKit para presencia global).
+- Sin E2EE (LiveKit lo soporta con `e2ee`, fuera del MVP).
+- Sin listado de participantes de voz en el sidebar (requeriría presencia/webhooks de LiveKit).
 
 ## Scripts
 

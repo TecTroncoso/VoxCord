@@ -84,7 +84,7 @@ export function ChannelSidebar({
           return (
             <li key={c.id}>
               <Link
-                href={`/s/${c.serverId}/${c.id}`}
+                href={`/s/${c.serverId}/${c.id}${c.type === 'voice' ? '?join=1' : ''}`}
                 className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-[15px] transition-colors ${
                   active ? 'bg-active text-header' : 'text-muted hover:bg-hover hover:text-header'
                 }`}
