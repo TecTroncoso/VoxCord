@@ -1,0 +1,49 @@
+# Perfil "baja latencia de voz" para LiveKit Server self-host.
+# Las claves coinciden con config-sample.yaml oficial (master, 2026).
+# Uso: docker run -v ${PWD}/deploy/livekit.low-latency.yaml:/etc/livekit.yaml \
+#        -p 7880:7880 -p 7881:7881 -p 7882-7892:7882-7892/udp \
+#        livekit/livekit-server --config /etc/livekit.yaml
+
+port: 7880
+
+rtc:
+  # UDP mux dedicado: todo el tráfico media entra por este rango.
+  # ABRIR en firewall; el audio por UDP directo es lo que evita saltos por TURN/TCP.
+  udp_port: 7882-7892
+  tcp_port: 7881
+  use_external_ip: true
+
+  # Menos cola en el SFU para audio (default 200 paquetes ≈ 4 s de margen).
+  # 100 paquetes ≈ 2 s a ptime 20 ms: suficiente para retransmisiones sin inflar stalls.
+  packet_buffer_size_audio: 100
+  packet_buffer_size_video: 500
+
+  # Escribir paquetes salgantes casi en cuanto llegan (menos encolado de salida).
+  batch_io:
+    batch_size: 2
+    max_flush_interval: 1ms
+
+  # Reenvío RED (FEC redundante) a los oyentes: tolera pérdida SIN subir el jitter buffer.
+  # Complementa al audio/red que ya publica el cliente; clave para bajar NetEQ a ~40 ms.
+  use_ice_lite: false
+
+audio:
+  active_red_encoding: true
+
+room:
+  # Rango de playout delay que el servidor anuncia a los clientes.
+  # default: min 100 / max 2000 ms. En salas de voz bajamos el techo.
+  playout_delay:
+    enabled: true
+    min: 60
+    max: 500
+
+# TURN integrado como fallback para NATs restrictivos (mejor UDP; TLS solo como último recurso)
+turn:
+  enabled: true
+  domain: tu-dominio.com
+  # tls_port: 5349
+
+# Claves API (las mismas que en .env.local)
+keys:
+  devkey: secretdevsecretdevsecretdevsecretdev

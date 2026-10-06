@@ -1,0 +1,22 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+# Deploy: Dashboard → New → Blueprint → conecta este repo → listo.
+# El tier Free duerme tras 15 min sin tráfico (primera carga lenta, el resto del tiempo va fino).
+services:
+  - type: web
+    name: voxcord
+    runtime: docker
+    plan: free
+    # Elige la región más cercana a tus usuarios: oregon | ohio | virginia | frankfurt | singapore
+    region: frankfurt
+    healthCheckPath: /
+    envVars:
+      - key: TURSO_DATABASE_URL
+        sync: false # se rellena en el dashboard (secret)
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
