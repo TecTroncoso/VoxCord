@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/client';
 import { Avatar } from '@/components/Avatar';
 import type { Channel, Server, User } from '@/lib/types';
+import type { CallState } from '@/lib/callState';
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -34,24 +35,27 @@ function VolumeIcon({ className }: { className?: string }) {
 
 function Group({
   title,
+  icon,
   children,
   onCreate,
   createLabel,
 }: {
   title: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   onCreate?: () => void;
   createLabel?: string;
 }) {
   return (
     <div className="mt-5 px-3">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center gap-1.5 px-1">
+        {icon && <span className="text-muted/80">{icon}</span>}
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted">{title}</span>
         {onCreate && (
           <button
             onClick={onCreate}
             title={createLabel}
-            className="rounded px-1 text-lg leading-none text-muted transition-colors hover:text-header"
+            className="ml-auto rounded px-1 text-lg leading-none text-muted transition-colors hover:text-header"
           >
             +
           </button>
@@ -62,12 +66,23 @@ function Group({
   );
 }
 
+function CommunityIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className ?? 'w-4 h-4'} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.8 19a6.2 6.2 0 0 1 12.4 0" />
+      <path d="M16.5 5.4a3.2 3.2 0 0 1 0 5.2M17.8 14.2A5 5 0 0 1 21.2 19" />
+    </svg>
+  );
+}
+
 export function ChannelSidebar({
   server,
   channels,
   activeChannelId,
   user,
   membersCount,
+  callState,
   onChannelsChanged,
 }: {
   server: Server | null;
@@ -75,6 +90,7 @@ export function ChannelSidebar({
   activeChannelId: string | null;
   user: User | null;
   membersCount: number | null;
+  callState: CallState | null;
   onChannelsChanged: () => void;
 }) {
   const [creating, setCreating] = useState<null | 'text' | 'voice'>(null);
@@ -104,22 +120,27 @@ export function ChannelSidebar({
 
   const channelRow = (c: Channel) => {
     const active = c.id === activeChannelId;
+    const inCall = callState?.channelId === c.id;
     return (
       <Link
         key={c.id}
         href={`/s/${c.serverId}/${c.id}${c.type === 'voice' ? '?join=1' : ''}`}
         className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[15px] transition-colors ${
-          active
-            ? 'bg-accent/20 text-header font-medium'
-            : 'text-muted hover:bg-hover hover:text-header'
+          active ? 'bg-accent/25 text-header font-medium' : 'text-muted hover:bg-hover hover:text-header'
         }`}
       >
-        {c.type === 'text' ? (
-          <HashIcon className={active ? 'text-muted' : 'text-muted'} />
-        ) : (
-          <VolumeIcon />
-        )}
+        {c.type === 'text' ? <HashIcon /> : <VolumeIcon />}
         <span className="truncate">{c.name}</span>
+        {inCall && (
+          <span className="ml-auto flex items-center gap-1 text-[11px] text-online">
+            {callState?.participants.length ?? 0} en llamada
+          </span>
+        )}
+        {active && !inCall && (
+          <svg viewBox="0 0 24 24" className="ml-auto h-4 w-4 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        )}
       </Link>
     );
   };
@@ -127,13 +148,19 @@ export function ChannelSidebar({
   return (
     <aside className="w-60 shrink-0 bg-sidebar flex flex-col min-h-0">
       {/* Cabecera del servidor */}
-      <div className="h-12 shrink-0 px-4 flex items-center gap-2 border-b border-white/5 shadow-sm">
-        <h2 className="font-bold text-header truncate">{server?.name ?? 'Cargando…'}</h2>
-        {server && (
-          <span className="rounded-full bg-white/6 px-2 py-0.5 text-[10px] font-semibold text-muted">
-            {membersCount ?? 0}
-          </span>
-        )}
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-white/5 px-4 py-2.5 shadow-sm">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-[11px] font-bold text-white">
+          {(server?.name ?? '··').slice(0, 2).toUpperCase()}
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-bold text-header">{server?.name ?? 'Cargando…'}</h2>
+          <p className="text-[11px] text-muted">
+            {membersCount ?? 0} {membersCount === 1 ? 'miembro' : 'miembros'}
+            {callState && callState.participants.length > 0 && (
+              <span className="text-online"> · {callState.participants.length} en llamada</span>
+            )}
+          </p>
+        </div>
       </div>
 
       {/* Buscador */}
@@ -152,6 +179,7 @@ export function ChannelSidebar({
       <div className="flex-1 overflow-y-auto pb-4">
         <Group
           title="Canales de texto"
+          icon={<CommunityIcon />}
           onCreate={() => setCreating(creating === 'text' ? null : 'text')}
           createLabel="Crear canal de texto"
         >
@@ -175,6 +203,7 @@ export function ChannelSidebar({
 
         <Group
           title="Canales de voz"
+          icon={<VolumeIcon className="w-4 h-4 text-muted/80" />}
           onCreate={() => setCreating(creating === 'voice' ? null : 'voice')}
           createLabel="Crear sala de voz"
         >

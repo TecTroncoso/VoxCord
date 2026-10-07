@@ -8,6 +8,7 @@ import { ChannelSidebar } from '@/components/ChannelSidebar';
 import { ChatArea } from '@/components/ChatArea';
 import { VoiceChannel } from '@/components/VoiceChannel';
 import { Avatar } from '@/components/Avatar';
+import type { CallState } from '@/lib/callState';
 import type { Channel, Server, User } from '@/lib/types';
 
 type Member = { id: string; username: string; role: string; joinedAt: number };
@@ -27,6 +28,7 @@ export function ServerShell({
   const [servers, setServers] = useState<Server[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [callState, setCallState] = useState<CallState | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +98,7 @@ export function ServerShell({
         activeChannelId={channelId}
         user={user}
         membersCount={members.length || null}
+        callState={callState}
         onChannelsChanged={load}
       />
 
@@ -115,7 +118,7 @@ export function ServerShell({
           <ChatArea key={channel.id} channel={channel} user={user} />
         )}
         {!error && loaded && channel?.type === 'voice' && (
-          <VoiceChannel key={channel.id} channel={channel} user={user} />
+          <VoiceChannel key={channel.id} channel={channel} user={user} onCallState={setCallState} />
         )}
       </main>
 
@@ -140,6 +143,50 @@ export function ServerShell({
             Nadie más se ha unido a este servidor todavía.
           </p>
         )}
+
+        {/* Widget "En llamada": solo con datos reales de la sala conectada */}
+        {callState && callState.participants.length > 0 && (
+          <div className="mx-3 mt-6 rounded-xl border border-online/30 bg-chat/70 p-3">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-online" />
+              <p className="text-sm font-semibold text-header">En llamada</p>
+              <span className="ml-auto text-[11px] text-muted">
+                {callState.participants.length} en llamada
+              </span>
+            </div>
+            <p className="mt-1 truncate text-xs text-muted">
+              {callState.channelName ? `🔊 ${callState.channelName}` : '🔊 Sala de voz'}
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center">
+              {callState.participants.slice(0, 8).map((p) => (
+                <span key={p.identity} className="-ml-1.5 first:ml-0 relative">
+                  <Avatar name={p.name} size={26} />
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Canales activos del servidor */}
+        <div className="mx-3 mt-6 mb-4 rounded-xl border border-white/8 bg-chat/50 p-3">
+          <p className="text-sm font-semibold text-header">Canales activos</p>
+          <ul className="mt-2 space-y-1">
+            {channels
+              .filter((c) => c.type === 'text' || c.type === 'voice')
+              .slice(0, 6)
+              .map((c) => (
+                <li key={c.id} className="flex items-center gap-2 text-xs text-muted">
+                  <span className="w-4 text-center text-muted/70">{c.type === 'text' ? '#' : '◍'}</span>
+                  <span className="truncate">{c.name}</span>
+                  {callState?.channelId === c.id && (
+                    <span className="ml-auto rounded-full bg-online/15 px-1.5 py-0.5 text-[10px] font-semibold text-online">
+                      {callState.participants.length}
+                    </span>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </div>
       </aside>
     </div>
   );

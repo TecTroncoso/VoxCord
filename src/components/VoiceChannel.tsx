@@ -31,6 +31,7 @@ import {
 import { api, avatarHue } from '@/lib/client';
 import { Avatar } from '@/components/Avatar';
 import type { Channel, User } from '@/lib/types';
+import type { CallState } from '@/lib/callState';
 
 /* ------------------------------------------------------------------ */
 /* Presets de calidad                                                  */
@@ -565,7 +566,7 @@ function ControlsBar({
 /* Sala conectada                                                      */
 /* ------------------------------------------------------------------ */
 
-function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset, onLeave, jitterMs, jitterAuto, autoMic }: {
+function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset, onLeave, jitterMs, jitterAuto, autoMic, onCallState }: {
   channel: Channel;
   screenPreset: string;
   micPreset: string;
@@ -575,6 +576,7 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
   jitterMs: number;
   jitterAuto: boolean;
   autoMic: boolean;
+  onCallState?: (state: CallState | null) => void;
 }) {
   const room = useRoomContext();
   const connectionState = useConnectionState();
@@ -636,6 +638,21 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
     const preset = MIC_PRESETS[micPreset];
     localParticipant.setMicrophoneEnabled(true, preset.capture, preset.publish).catch(() => undefined);
   }, [autoMic, connectionState, localParticipant, micPreset]);
+
+  // Reportar el estado real de la llamada al shell (sidebar + rail derecho)
+  const connected = connectionState === 'connected';
+  useEffect(() => {
+    if (!onCallState) return;
+    if (!connected) {
+      onCallState(null);
+      return;
+    }
+    onCallState({
+      channelId: channel.id,
+      channelName: channel.name,
+      participants: participants.map((p) => ({ identity: p.identity, name: p.name || p.identity })),
+    });
+  }, [onCallState, connected, channel.id, channel.name, participants]);
   const screenTracks = useTracks([{ source: Track.Source.ScreenShare, withPlaceholder: false }], {
     onlySubscribed: false,
   }).filter(isTrackReference);
@@ -727,7 +744,15 @@ function RoomUI({ channel, screenPreset, micPreset, onScreenPreset, onMicPreset,
 /* Entrada al canal                                                    */
 /* ------------------------------------------------------------------ */
 
-export function VoiceChannel({ channel, user }: { channel: Channel; user: User }) {
+export function VoiceChannel({
+  channel,
+  user,
+  onCallState,
+}: {
+  channel: Channel;
+  user: User;
+  onCallState?: (state: CallState | null) => void;
+}) {
   const [token, setToken] = useState<{ token: string; url: string } | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -938,6 +963,7 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
           jitterMs={jitterMs}
           jitterAuto={jitterAuto}
           autoMic={autoMic}
+          onCallState={onCallState}
         />
       </LiveKitRoom>
       {error && (
