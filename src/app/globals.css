@@ -1,21 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-rail: #1e1f22;
-  --color-sidebar: #2b2d31;
-  --color-chat: #313338;
-  --color-panel: #232428;
-  --color-hover: #35373c;
-  --color-active: #404249;
-  --color-input: #383a40;
-  --color-accent: #5865f2;
-  --color-accent-hover: #4752c4;
-  --color-online: #23a559;
-  --color-danger: #f23f43;
-  --color-danger-hover: #c9393c;
-  --color-muted: #949ba4;
-  --color-text: #dbdee1;
-  --color-header: #f2f3f5;
+  --color-rail: #070911;
+  --color-sidebar: #13151f;
+  --color-chat: #1b1e2a;
+  --color-panel: #222636;
+  --color-elevated: #2a2f42;
+  --color-hover: #262a3a;
+  --color-active: #313649;
+  --color-input: #1e2230;
+  --color-accent: #6d5efc;
+  --color-accent-hover: #5b4ce0;
+  --color-accent-2: #4f8bff;
+  --color-online: #2fdc9a;
+  --color-danger: #ff5c5c;
+  --color-danger-hover: #e04a4a;
+  --color-muted: #9aa1b2;
+  --color-text: #d7dbe6;
+  --color-header: #f4f6fb;
 }
 
 html,
@@ -25,9 +27,14 @@ body {
 }
 
 body {
-  background: var(--color-chat);
   color: var(--color-text);
-  font-family: "gg sans", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, system-ui, sans-serif;
+  background-color: #0a0c14;
+  background-image:
+    radial-gradient(1100px 620px at 15% -12%, rgba(109, 94, 252, 0.2), transparent 62%),
+    radial-gradient(900px 520px at 88% -4%, rgba(79, 139, 255, 0.14), transparent 58%),
+    radial-gradient(700px 500px at 50% 110%, rgba(109, 94, 252, 0.08), transparent 60%);
+  background-attachment: fixed;
 }
 
 *::-webkit-scrollbar {
@@ -35,7 +42,7 @@ body {
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #1a1b1e;
+  background: #12141d;
   border-radius: 4px;
 }
 *::-webkit-scrollbar-track {
