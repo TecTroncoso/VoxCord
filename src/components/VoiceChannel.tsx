@@ -440,12 +440,13 @@ function ControlsBar({
     await localParticipant.setScreenShareEnabled(
       true,
       {
-        audio: true,
+        // restricOwnAudio: excluye el audio de esta pestaña del stream compartido
+        audio: { restrictOwnAudio: true },
+        // y el navegador no reproduce localmente el audio de esa pestaña
+        suppressLocalAudioPlayback: true,
         systemAudio: 'include',
         selfBrowserSurface: 'include',
         surfaceSwitching: 'include',
-        // No reproducir localmente el audio de la pestaña compartida: evita eco
-        suppressLocalAudioPlayback: true,
         ...preset.capture,
       },
       {
@@ -465,7 +466,12 @@ function ControlsBar({
         const preset = SCREEN_PRESETS[id];
         await localParticipant.setScreenShareEnabled(
           true,
-          { audio: true, systemAudio: 'include', ...preset.capture },
+          {
+            audio: { restrictOwnAudio: true },
+            suppressLocalAudioPlayback: true,
+            systemAudio: 'include',
+            ...preset.capture,
+          },
           { videoCodec: 'vp9', degradationPreference: 'maintain-resolution', ...preset.publish },
         );
       });
@@ -707,7 +713,10 @@ export function VoiceChannel({ channel, user }: { channel: Channel; user: User }
         screenShareEncoding: SCREEN_PRESETS.p1080_30.publish.screenShareEncoding,
       },
       screenShareCaptureDefaults: {
-        audio: true,
+        // restrictOwnAudio: no capturar el audio de ESTA pestaña en el stream (anti-eco)
+        audio: { restrictOwnAudio: true },
+        // y no reproducir localmente el audio compartido
+        suppressLocalAudioPlayback: true,
         systemAudio: 'include',
         contentHint: 'detail',
         resolution: VideoPresets.h1080.resolution,

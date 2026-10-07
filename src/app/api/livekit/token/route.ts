@@ -18,6 +18,16 @@ export const dynamic = 'force-dynamic';
 const NBF_BACKDATE_SEC = 600; // 10 min de tolerancia al clock skew
 const TOKEN_TTL_SEC = 2 * 60 * 60; // 2 h, igual que antes
 
+/**
+ * Playout delay de sala para canales de voz (docs LiveKit Robotics):
+ * cuánto buffer de VÍDEO/pantalla mantiene cada suscriptor antes de pintar.
+ * 0/500 => pantalla compartida casi en tiempo real para el que la mira.
+ * Solo vídeo (el audio se ajusta en el cliente con jitterBufferTarget) y solo
+ * aplica cuando se CREA la sala (LiveKit ignora el roomConfig de quien entra después).
+ * Caveat documentado: puede desincronizar lip-sync en mala red.
+ */
+const VOICE_ROOM_PLAYOUT = { minPlayoutDelay: 0, maxPlayoutDelay: 500 };
+
 type VideoGrants = {
   roomJoin: boolean;
   room: string;
@@ -36,6 +46,7 @@ function mintLiveKitToken(
   identity: string,
   name: string,
   video: VideoGrants,
+  roomConfig?: Record<string, unknown>,
 ): string {
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
@@ -47,6 +58,7 @@ function mintLiveKitToken(
       nbf: now - NBF_BACKDATE_SEC,
       exp: now + TOKEN_TTL_SEC,
       video,
+      ...(roomConfig ? { roomConfig } : {}),
     }),
   );
   const sig = createHmac('sha256', apiSecret).update(`${header}.${payload}`).digest('base64url');
@@ -77,13 +89,20 @@ export async function POST(req: Request) {
   // Sufijo aleatorio para permitir la misma cuenta en varias pestañas/dispositivos
   const identity = `${session.id}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const token = mintLiveKitToken(apiKey, apiSecret, identity, session.username, {
-    roomJoin: true,
-    room: roomName,
-    canPublish: true,
-    canSubscribe: true,
-    canPublishData: true,
-  });
+  const token = mintLiveKitToken(
+    apiKey,
+    apiSecret,
+    identity,
+    session.username,
+    {
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    },
+    roomName.startsWith('voice-') ? VOICE_ROOM_PLAYOUT : undefined,
+  );
 
   return NextResponse.json({ token, url: serverUrl, identity });
 }
