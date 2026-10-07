@@ -15,6 +15,7 @@ import {
   isTrackReference,
   type TrackReference,
 } from '@livekit/components-react';
+import { useKrispNoiseFilter } from '@livekit/components-react/krisp';
 import {
   AudioPresets,
   Room,
@@ -78,8 +79,8 @@ type MicPreset = {
 const MIC_PRESETS: Record<string, MicPreset> = {
   voice: {
     label: 'Voz (baja latencia)',
-    // latency: 0 -> el navegador elige el modo de captura de menor latencia
-    // (MediaTrackConstraints.latency; los navegadores sin soporte lo ignoran).
+    // NS integrado corre dentro del frame de 10 ms del APM: latencia ~0 ms.
+    // Lo que suma +10-20 ms son los filtros IA (Krisp/RNNoise), por eso solo en HD.
     capture: {
       echoCancellation: true,
       noiseSuppression: true,
@@ -90,7 +91,9 @@ const MIC_PRESETS: Record<string, MicPreset> = {
     publish: { audioPreset: AudioPresets.speech, dtx: true, red: true },
   },
   hd: {
-    label: 'Voz HD',
+    label: 'Voz HD (+ filtro IA de ruido)',
+    // Base WebRTC (gratis); si la cuenta de LiveKit Cloud habilita Krisp, se
+    // puede activar el filtro IA adicional desde la barra de controles (solo HD).
     capture: {
       echoCancellation: true,
       noiseSuppression: true,
@@ -231,6 +234,12 @@ const ChevronIcon = ({ className }: { className?: string }) => (
 const FullscreenIcon = ({ className }: { className?: string }) => (
   <Svg className={className}>
     <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Svg>
+);
+
+const WaveIcon = ({ className }: { className?: string }) => (
+  <Svg className={className}>
+    <path d="M3 12h1.5M7.5 8v8M12 5v14M16.5 9v6M20 12h1" />
   </Svg>
 );
 
@@ -403,10 +412,12 @@ function ControlsBar({
   onLeave: () => void;
 }) {
   const { localParticipant } = useLocalParticipant();
+  const krisp = useKrispNoiseFilter();
   const mic = localParticipant.isMicrophoneEnabled;
   const cam = localParticipant.isCameraEnabled;
   const sharing = localParticipant.isScreenShareEnabled;
   const [busy, setBusy] = useState(false);
+  const krispAvailable = micPreset === 'hd';
 
   const guard = useCallback(async (fn: () => Promise<unknown>) => {
     if (busy) return;
@@ -481,6 +492,9 @@ function ControlsBar({
   // Cambiar modo de micrófono en caliente
   const changeMicPreset = (id: string) => {
     onMicPreset(id);
+    if (id !== 'hd' && krisp.isNoiseFilterEnabled) {
+      void krisp.setNoiseFilterEnabled(false).catch(() => undefined);
+    }
     if (mic) {
       guard(async () => {
         await localParticipant.setMicrophoneEnabled(false);
@@ -488,6 +502,11 @@ function ControlsBar({
         await localParticipant.setMicrophoneEnabled(true, preset.capture, preset.publish);
       });
     }
+  };
+
+  const toggleKrisp = () => {
+    if (!krispAvailable) return;
+    void krisp.setNoiseFilterEnabled(!krisp.isNoiseFilterEnabled).catch(() => undefined);
   };
 
   const btn = 'h-12 w-12 rounded-full flex items-center justify-center transition-colors';
@@ -502,6 +521,27 @@ function ControlsBar({
         </button>
         <PresetMenu value={micPreset} options={MIC_PRESETS} onChange={changeMicPreset} title="Calidad de micrófono" />
       </div>
+
+      <button
+        onClick={toggleKrisp}
+        disabled={!krispAvailable || krisp.isNoiseFilterPending}
+        className={
+          !krispAvailable
+            ? `${btn} bg-hover text-muted cursor-not-allowed opacity-50`
+            : krisp.isNoiseFilterEnabled
+              ? `${btn} bg-online text-white`
+              : on
+        }
+        title={
+          !krispAvailable
+            ? 'Filtro IA de ruido: solo en preset Voz HD'
+            : krisp.isNoiseFilterEnabled
+              ? 'Desactivar filtro IA de ruido'
+              : 'Activar filtro IA de ruido (Krisp)'
+        }
+      >
+        <WaveIcon className="w-6 h-6" />
+      </button>
 
       <button onClick={toggleCam} disabled={busy} className={cam ? on : `${btn} bg-hover hover:bg-active text-text`} title={cam ? 'Apagar cámara' : 'Encender cámara'}>
         <CamIcon off={!cam} className="w-6 h-6" />
