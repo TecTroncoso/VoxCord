@@ -82,8 +82,9 @@ export function ChannelSidebar({
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
+    const list = Array.isArray(channels) ? channels : [];
     const q = query.trim().toLowerCase();
-    return q ? channels.filter((c) => c.name.toLowerCase().includes(q)) : channels;
+    return q ? list.filter((c) => c.name.toLowerCase().includes(q)) : list;
   }, [channels, query]);
 
   const textChannels = filtered.filter((c) => c.type === 'text');

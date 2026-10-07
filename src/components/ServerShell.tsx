@@ -37,9 +37,11 @@ export function ServerShell({
       setChannels(chs);
       setLoaded(true);
       setError(null);
-      // Al entrar a un servidor, unirse a él (membresía real, idempotente)
-      const m = await api<Member[]>(`/api/servers/${serverId}/members`, { method: 'POST' });
-      setMembers(m);
+      // Al entrar a un servidor, unirse a él (POST, idempotente) y leer la
+      // lista real de miembros (GET) — el POST devuelve { ok: true }, no la lista.
+      await api<{ ok: boolean }>(`/api/servers/${serverId}/members`, { method: 'POST' });
+      const list = await api<Member[]>(`/api/servers/${serverId}/members`);
+      setMembers(Array.isArray(list) ? list : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar el servidor');
     }
@@ -64,8 +66,9 @@ export function ServerShell({
   const channel = channels.find((c) => c.id === channelId) ?? null;
 
   const grouped = useMemo(() => {
-    const online = members.filter((m) => m.id === user.id);
-    const offline = members.filter((m) => m.id !== user.id);
+    const list = Array.isArray(members) ? members : [];
+    const online = list.filter((m) => m.id === user.id);
+    const offline = list.filter((m) => m.id !== user.id);
     return { online, offline };
   }, [members, user.id]);
 
