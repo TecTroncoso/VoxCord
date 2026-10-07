@@ -60,12 +60,23 @@ export function useCurrentUser(): { user: User | null; hydrated: boolean; setUse
   return { user, hydrated, setUser };
 }
 
-export async function login(username: string, password: string): Promise<User> {
-  return api<User>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+export async function login(identifier: string, password: string, remember = true): Promise<User> {
+  return api<User>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password, remember }),
+  });
 }
 
-export async function register(username: string, password: string): Promise<User> {
-  return api<User>('/api/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) });
+export async function register(
+  username: string,
+  email: string,
+  password: string,
+  remember = true,
+): Promise<User> {
+  return api<User>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, email, password, remember }),
+  });
 }
 
 export async function logout(): Promise<void> {

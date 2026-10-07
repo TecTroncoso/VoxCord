@@ -77,17 +77,23 @@ export function verifySession(token: string): SessionUser | null {
 
 /* -------------------------------- cookies -------------------------------- */
 
-export async function setSessionCookie(user: SessionUser, secureTransport: boolean): Promise<void> {
+export async function setSessionCookie(
+  user: SessionUser,
+  secureTransport: boolean,
+  remember = true,
+): Promise<void> {
   const store = await cookies();
-  store.set(SESSION_COOKIE, signSession(user), {
+  const cookie = {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     // Secure solo bajo HTTPS real (prod tras proxy); en http local la cookie
     // debe enviarse igualmente o la sesión no persistiría en desarrollo.
     secure: secureTransport,
-    maxAge: SESSION_TTL_SEC,
     path: '/',
-  });
+    // Sin maxAge = cookie de sesión: se cierra al cerrar el navegador.
+    ...(remember ? { maxAge: SESSION_TTL_SEC } : {}),
+  };
+  store.set(SESSION_COOKIE, signSession(user), cookie);
 }
 
 /** Detecta si la request llegó por HTTPS (Vercel/Render terminan TLS en proxy). */

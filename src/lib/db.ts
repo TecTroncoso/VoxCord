@@ -25,6 +25,7 @@ const SCHEMA: string[] = [
   `CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
+    email TEXT,
     password_hash TEXT,
     created_at INTEGER NOT NULL
   )`,
@@ -71,11 +72,20 @@ export function ensureSchema(): Promise<Client> {
         client = createClient({ url: 'file:./dev.db' });
       }
       await client.batch(SCHEMA, 'write');
-      // Migración para bases creadas antes de la autenticación:
-      try {
-        await client.execute('ALTER TABLE users ADD COLUMN password_hash TEXT');
-      } catch {
-        // la columna ya existe
+      // Migraciones para bases creadas antes de cada campo (idempotentes):
+      const migrations = [
+        'ALTER TABLE users ADD COLUMN password_hash TEXT',
+        'ALTER TABLE users ADD COLUMN email TEXT',
+        // Un email por cuenta (los registros sin email quedan fuera):
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+         ON users(email) WHERE email IS NOT NULL AND email <> ''`,
+      ];
+      for (const sql of migrations) {
+        try {
+          await client.execute(sql);
+        } catch {
+          // ya aplicado
+        }
       }
       g.__voxcordDb = client;
       return client;

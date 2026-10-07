@@ -1,7 +1,8 @@
 export type User = {
   id: string;
   username: string;
-  createdAt: number;
+  email?: string | null;
+  createdAt?: number;
 };
 
 export type Server = {

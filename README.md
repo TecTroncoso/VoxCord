@@ -21,17 +21,20 @@ Persistencia en **Turso** (libSQL): usuarios, servidores, canales y mensajes. El
 ```
 src/
 ├── app/
-│   ├── page.tsx                    # Landing: usuario + lista/crear servidores
+│   ├── page.tsx                    # Hub de servidores (redirige a /login sin sesión)
+│   ├── login/page.tsx              # Iniciar sesión
+│   ├── register/page.tsx           # Crear cuenta
 │   ├── s/[serverId]/page.tsx       # Redirige al primer canal de texto
 │   ├── s/[serverId]/[channelId]/   # Shell de 3 columnas (texto o voz)
 │   └── api/
-│       ├── users/route.ts          # find-or-create usuario
+│       ├── auth/register|login|logout|me/route.ts
 │       ├── servers/route.ts        # listar/crear servidores (+ canales default)
 │       ├── servers/[serverId]/channels/route.ts
 │       ├── channels/[channelId]/messages/route.ts   # historial + envío
 │       ├── channels/[channelId]/stream/route.ts     # SSE
 │       └── livekit/token/route.ts  # JWT de acceso a salas
 ├── components/
+│   ├── AuthShell.tsx               # Hero + card + campos (login/register)
 │   ├── ServerRail.tsx / ChannelSidebar.tsx / ChatArea.tsx / Avatar.tsx
 │   ├── ServerShell.tsx             # layout de 3 columnas
 │   └── VoiceChannel.tsx            # sala de voz + pantalla compartida
@@ -176,10 +179,19 @@ Micrófono y compartir pantalla exigen contexto seguro: todas las opciones anter
 
 ## Autenticación
 
-- **Registro / login** con usuario + contraseña. La contraseña se guarda como **scrypt + salt** (`node:crypto`, sin dependencias), nunca en claro.
-- **Sesión**: JWT HS256 en cookie **httpOnly** (`voxcord_session`, 7 días, `SameSite=Lax`, `Secure` en producción). Firmada con `AUTH_SECRET` (o derivado de `TURSO_AUTH_TOKEN` como fallback estable; pon `AUTH_SECRET` explícito en producción).
+- **Páginas separadas**: `/login` (iniciar sesión) y `/register` (crear cuenta), con el mismo hero y pestañas que saltan entre ambas. Al autenticar, se entra al hub de servidores en `/`.
+- **Registro**: nombre de usuario (2–32), **correo electrónico** (único, con índice parcial en Turso) y contraseña (**mínimo 8 caracteres**), con contador de caracteres y confirmación de contraseña en línea.
+- **Login por correo o usuario**: la API acepta cualquiera de los dos como identificador.
+- **Contraseñas**: hash **scrypt + salt** (`node:crypto`, sin dependencias), nunca en claro.
+- **Sesión**: JWT HS256 en cookie **httpOnly** (`voxcord_session`, `SameSite=Lax`, `Secure` solo bajo HTTPS real). «Mantener sesión iniciada» = cookie persistente de 7 días (`Max-Age=604800`); desmarcado = cookie de sesión, que se cierra al cerrar el navegador. Firmada con `AUTH_SECRET` (o derivado de `TURSO_AUTH_TOKEN`).
 - Las rutas que escriben (`POST /api/servers`, `channels`, `messages`, `livekit/token`) exigen sesión; el autor de los mensajes se toma del JWT, no del cliente.
-- Cuentas creadas antes de esta versión (sin contraseña): registrarse con el mismo nombre "reclama" la cuenta poniéndole contraseña.
+- Cuentas creadas antes de esta versión (sin contraseña ni email): registrarse con el mismo usuario "reclama" la cuenta.
+
+### Pendiente de implementar
+
+- **Login social** (Google / Discord / Steam): los botones están maquetados en el diseño pero **desactivados**; falta OAuth con credenciales de proveedor y Callback API.
+- **Recuperación de contraseña** y **verificación de correo**: requieren servicio de envío de emails.
+- **Términos de Servicio / Política de Privacidad**: los enlaces del registro son marcadores; faltan los documentos.
 
 ## Solución de problemas
 
