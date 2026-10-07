@@ -177,9 +177,18 @@ Deploy en Vercel: Import Project → añade las 5 variables de entorno → listo
 
 Micrófono y compartir pantalla exigen contexto seguro: todas las opciones anteriores dan TLS gratis. En local vale `localhost`.
 
+## Flujo de entrada
+
+1. Sin sesión → `/login` o `/register`.
+2. Al autenticar, `/` **entra directamente a la interfaz del servidor**: redirige al último servidor visitado (guardado en `localStorage`) o al primero disponible, y dentro de él al primer canal de texto.
+3. Si la cuenta no tiene servidores, `/` muestra el onboarding para crear el primero (con canal de texto y sala de voz ya listos).
+4. Dentro de un servidor: rail de servidores con creación rápida, sidebar con buscador y categorías, chat o voz, y rail derecho de **miembros** alimentado por la tabla `server_members` (el creador queda como `owner`; entrar a un servidor te une de forma idempotente).
+
+> La presencia real (quién está conectado a qué canal, no solo quién se ha unido) requiere el data channel de presencia por servidor; los estados "en línea" del rail derecho se añadirán con esa función.tados "en línea" del rail derecho seosingirán con esa función.
+
 ## Autenticación
 
-- **Páginas separadas**: `/login` (iniciar sesión) y `/register` (crear cuenta), con el mismo hero y pestañas que saltan entre ambas. Al autenticar, se entra al hub de servidores en `/`.
+- **Páginas separadas**: `/login` (iniciar sesión) y `/register` (crear cuenta), con el mismo hero y pestañas que saltan entre ambas. Al autenticar se entra directo a la interfaz del servidor (ver *Flujo de entrada*).
 - **Registro**: nombre de usuario (2–32), **correo electrónico** (único, con índice parcial en Turso) y contraseña (**mínimo 8 caracteres**), con contador de caracteres y confirmación de contraseña en línea.
 - **Login por correo o usuario**: la API acepta cualquiera de los dos como identificador.
 - **Contraseñas**: hash **scrypt + salt** (`node:crypto`, sin dependencias), nunca en claro.

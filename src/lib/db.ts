@@ -50,6 +50,13 @@ const SCHEMA: string[] = [
     content TEXT NOT NULL,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS server_members (
+    server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member',
+    joined_at INTEGER NOT NULL,
+    PRIMARY KEY (server_id, user_id)
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_channels_server ON channels(server_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at)`,
 ];
