@@ -211,7 +211,7 @@ Para **terminar la versión web** (en este orden, de mayor valor por esfuerzo):
 7. **PWA / responsive**: instalable en móvil y con layout adaptado; es lo que marca la diferencia antes de cualquier cliente nativo.
 8. **Archivos y reacciones en voz**: subida de archivos (Turso o S3) y reacciones rápidas durante la llamada.
 
-Cliente nativo (escritorio/Android) queda **fuera de alcance hasta cerrar la web**; el objetivo de la web es que cubra el caso de uso completo en el navegador.
+Cliente nativo (escritorio/Android) queda **fuera de alcance hasta cerrar la web**; el objetivo de la web es que cubra el caso de uso completo en el navegador. La hoja de ruta de lo que se puede mejorar ahí (zero jitter buffer, ptime nativo, ruta de audio nativa, y el mito de que Electron no gana latencia) está en **[docs/native-client-roadmap.md](docs/native-client-roadmap.md)**.
 
 ## Limitaciones conocidas del MVP
 
