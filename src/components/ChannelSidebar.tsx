@@ -146,14 +146,23 @@ export function ChannelSidebar({
   };
 
   return (
-    <aside className="w-60 shrink-0 bg-sidebar flex flex-col min-h-0">
+    <aside className="w-[272px] shrink-0 bg-sidebar flex flex-col min-h-0 rounded-tr-2xl border-t border-r border-white/8">
       {/* Cabecera del servidor */}
-      <div className="flex shrink-0 items-center gap-2.5 border-b border-white/5 px-4 py-2.5 shadow-sm">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-[11px] font-bold text-white">
+      <button
+        onClick={() => setQuery('')}
+        title="Servidor: nombre y miembros"
+        className="flex shrink-0 items-center gap-3 border-b border-white/5 px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-hover"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-xs font-bold text-white shadow-[0_4px_12px_rgba(106,90,249,0.35)]">
           {(server?.name ?? '··').slice(0, 2).toUpperCase()}
         </span>
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold text-header">{server?.name ?? 'Cargando…'}</h2>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h2 className="truncate text-sm font-bold text-header">{server?.name ?? 'Cargando…'}</h2>
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-accent-2" fill="currentColor" aria-hidden>
+              <path d="M12 2.5 14.2 8l5.8.6-4.4 4 1.2 5.7L12 15.5 7.2 18.3l1.2-5.7-4.4-4L9.8 8 12 2.5Z" />
+            </svg>
+          </div>
           <p className="text-[11px] text-muted">
             {membersCount ?? 0} {membersCount === 1 ? 'miembro' : 'miembros'}
             {callState && callState.participants.length > 0 && (
@@ -161,7 +170,10 @@ export function ChannelSidebar({
             )}
           </p>
         </div>
-      </div>
+        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
 
       {/* Buscador */}
       <div className="px-3 pt-3">
@@ -227,14 +239,23 @@ export function ChannelSidebar({
       </div>
 
       {user && (
-        <div className="h-[54px] shrink-0 bg-panel flex items-center gap-2 px-2 border-t border-white/5">
+        <div className="flex h-[54px] shrink-0 items-center gap-2.5 border-t border-white/5 bg-panel px-2">
           <Avatar name={user.username} size={32} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-header truncate leading-tight">{user.username}</p>
-            <p className="flex items-center gap-1.5 text-[11px] text-muted leading-tight">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold leading-tight text-header">{user.username}</p>
+            <p className="flex items-center gap-1.5 text-[11px] leading-tight text-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-online" /> en línea
             </p>
           </div>
+          <button
+            title="Ajustes (próximamente)"
+            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-hover hover:text-header"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9 2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2 2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9 2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 1Z" />
+            </svg>
+          </button>
         </div>
       )}
     </aside>
