@@ -123,8 +123,8 @@ export function ServerShell({
       </main>
 
       {/* Rail derecho: miembros (datos reales de la tabla server_members) */}
-      <aside className="hidden w-[248px] shrink-0 overflow-y-auto border-l border-white/5 bg-sidebar xl:block">
-        <div className="flex h-12 items-center gap-2 border-b border-white/5 px-4">
+      <aside className="hidden w-[248px] shrink-0 overflow-y-auto border-l border-line bg-sidebar xl:block">
+        <div className="flex h-12 items-center gap-2 border-b border-line px-4">
           <span className="text-sm font-bold text-header">Miembros</span>
           <span className="rounded-md bg-white/6 px-1.5 py-0.5 text-[10px] font-semibold text-muted">
             {members.length}
@@ -154,7 +154,7 @@ export function ServerShell({
 
         {/* Widget "En llamada": solo con datos reales de la sala conectada */}
         {callState && callState.participants.length > 0 && (
-          <div className="mx-3 mt-5 rounded-xl border border-white/8 bg-panel p-3 shadow-lg shadow-black/20">
+          <div className="mx-3 mt-5 rounded-xl border border-line/70 bg-panel p-3 shadow-lg shadow-black/20">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-online shadow-[0_0_8px_rgba(35,214,127,0.8)]" />
               <p className="text-sm font-bold text-header">En llamada</p>
@@ -177,7 +177,7 @@ export function ServerShell({
         )}
 
         {/* Canales activos del servidor */}
-        <div className="mx-3 mb-5 mt-4 rounded-xl border border-white/8 bg-panel p-3">
+        <div className="mx-3 mb-5 mt-4 rounded-xl border border-line/70 bg-panel p-3">
           <p className="text-sm font-bold text-header">Canales activos</p>
           <ul className="mt-2 space-y-1">
             {channels.slice(0, 7).map((c) => (

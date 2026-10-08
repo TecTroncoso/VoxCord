@@ -126,7 +126,9 @@ export function ChannelSidebar({
         key={c.id}
         href={`/s/${c.serverId}/${c.id}${c.type === 'voice' ? '?join=1' : ''}`}
         className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[15px] transition-colors ${
-          active ? 'bg-accent/25 text-header font-medium' : 'text-muted hover:bg-hover hover:text-header'
+          active
+            ? 'bg-accent text-white font-medium shadow-[0_4px_14px_rgba(106,90,249,0.35)]'
+            : 'text-muted hover:bg-hover hover:text-header'
         }`}
       >
         {c.type === 'text' ? <HashIcon /> : <VolumeIcon />}
@@ -146,12 +148,12 @@ export function ChannelSidebar({
   };
 
   return (
-    <aside className="w-[272px] shrink-0 bg-sidebar flex flex-col min-h-0 rounded-tr-2xl border-t border-r border-white/8">
+    <aside className="w-[272px] shrink-0 bg-sidebar flex flex-col min-h-0 rounded-tr-2xl border-t border-r border-line/70">
       {/* Cabecera del servidor */}
       <button
         onClick={() => setQuery('')}
         title="Servidor: nombre y miembros"
-        className="flex shrink-0 items-center gap-3 border-b border-white/5 px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-hover"
+        className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-2.5 text-left shadow-sm transition-colors hover:bg-hover"
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-xs font-bold text-white shadow-[0_4px_12px_rgba(106,90,249,0.35)]">
           {(server?.name ?? '··').slice(0, 2).toUpperCase()}
@@ -239,7 +241,7 @@ export function ChannelSidebar({
       </div>
 
       {user && (
-        <div className="flex h-[54px] shrink-0 items-center gap-2.5 border-t border-white/5 bg-panel px-2">
+        <div className="flex h-[54px] shrink-0 items-center gap-2.5 border-t border-line bg-panel px-2">
           <Avatar name={user.username} size={32} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold leading-tight text-header">{user.username}</p>

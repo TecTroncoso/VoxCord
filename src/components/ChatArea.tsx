@@ -224,9 +224,14 @@ export function ChatArea({ channel, user }: { channel: Channel; user: User }) {
   const topic = channel.name === 'general' ? 'Chat principal de la comunidad' : `Canal de texto · ${channel.name}`;
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 relative">
+      {/* Glow violeta superior, como la aurora del mockup */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(70%_100%_at_50%_0%,rgba(106,90,249,0.16),transparent_70%)]"
+        aria-hidden
+      />
       {/* Cabecera */}
-      <header className="h-12 shrink-0 flex items-center gap-3 px-4 border-b border-white/5">
+      <header className="relative z-10 h-12 shrink-0 flex items-center gap-3 px-4 border-b border-line">
         <span className="text-muted font-bold text-2xl leading-none">#</span>
         <h1 className="font-bold text-header">{channel.name}</h1>
         <span className="hidden truncate border-l border-white/10 pl-3 text-sm text-muted md:block">{topic}</span>
@@ -264,7 +269,7 @@ export function ChatArea({ channel, user }: { channel: Channel; user: User }) {
       </header>
 
       {/* Mensajes */}
-      <div ref={listRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
+      <div ref={listRef} onScroll={onScroll} className="relative z-10 flex-1 overflow-y-auto px-4 py-4 min-h-0">
         {visible.length === 0 && (
           /* Tarjeta de bienvenida, estilo mockup */
           <div className="relative mb-6 overflow-hidden rounded-2xl border border-white/8 bg-sidebar p-6 text-center">
@@ -322,7 +327,7 @@ export function ChatArea({ channel, user }: { channel: Channel; user: User }) {
       </div>
 
       {/* Compositor */}
-      <form onSubmit={send} className="shrink-0 px-4 pb-5">
+      <form onSubmit={send} className="relative z-10 shrink-0 px-4 pb-5">
         <div className="flex items-center gap-2 rounded-2xl bg-input px-3 py-2 focus-within:ring-1 focus-within:ring-accent/50">
           <button
             type="button"

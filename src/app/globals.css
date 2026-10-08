@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-rail: #0a0b12;
-  --color-sidebar: #151823;
-  --color-chat: #1a1d28;
-  --color-panel: #212533;
-  --color-elevated: #232838;
-  --color-hover: #262b3a;
-  --color-active: #323850;
-  --color-input: #1e2230;
+  --color-rail: #0b0c14;
+  --color-sidebar: #191c28;
+  --color-chat: #1e2130;
+  --color-panel: #262a3c;
+  --color-elevated: #2a2f43;
+  --color-hover: #2b3145;
+  --color-active: #353c56;
+  --color-input: #22263a;
+  --color-line: #2e3450;
   --color-accent: #6a5af9;
   --color-accent-hover: #5a4ae0;
   --color-accent-2: #4f8bff;
   --color-online: #23d67f;
   --color-danger: #ff5c5c;
   --color-danger-hover: #e04a4a;
-  --color-muted: #8d95a9;
-  --color-text: #e2e6ef;
+  --color-muted: #949cb2;
+  --color-text: #e4e8f1;
   --color-header: #ffffff;
 }
 
@@ -31,9 +32,9 @@ body {
   font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, system-ui, sans-serif;
   background-color: #0c0e16;
   background-image:
-    radial-gradient(1100px 620px at 15% -12%, rgba(106, 90, 249, 0.22), transparent 62%),
-    radial-gradient(900px 520px at 88% -4%, rgba(79, 139, 255, 0.15), transparent 58%),
-    radial-gradient(700px 500px at 50% 110%, rgba(106, 90, 249, 0.08), transparent 60%);
+    radial-gradient(1100px 620px at 15% -12%, rgba(106, 90, 249, 0.26), transparent 62%),
+    radial-gradient(900px 520px at 88% -4%, rgba(79, 139, 255, 0.18), transparent 58%),
+    radial-gradient(700px 500px at 50% 110%, rgba(106, 90, 249, 0.1), transparent 60%);
   background-attachment: fixed;
 }
 
